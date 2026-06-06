@@ -4,8 +4,34 @@
   "description": "Мини-игры для тренировки мозга",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#1a1f2e",
+  "background_color": "#87CEEB",
   "theme_color": "#1a1f2e",
   "orientation": "portrait",
-  "lang": "ru"
+  "lang": "ru",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-192-maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icons/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
 }
