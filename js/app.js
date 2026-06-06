@@ -1,4 +1,8 @@
 (function () {
+  if (location.search.indexOf("_reset=") !== -1) {
+    history.replaceState(null, "", location.pathname || "/");
+  }
+
   var screenHome = document.getElementById("screen-home");
   var screenGame = document.getElementById("screen-game");
   var screenResult = document.getElementById("screen-result");
@@ -190,20 +194,16 @@
 
   function resetSiteSettings() {
     var ok = window.confirm(
-      "Сбросить все данные сайта?\n\nБудут удалены прогресс, рекорды, серия дней и настройки игр. Действие нельзя отменить."
+      "Сбросить все данные сайта?\n\nБудут удалены прогресс, рекорды, настройки, кэш и сохранённые файлы сайта. Страница перезагрузится. Действие нельзя отменить."
     );
     if (!ok) return;
 
-    var btn = document.getElementById("btn-reset-site");
-    btn.disabled = true;
+    document.getElementById("btn-reset-site").disabled = true;
 
-    BrainStorage.resetAllSiteData()
-      .then(function () {
-        goHome();
-      })
-      .finally(function () {
-        btn.disabled = false;
-      });
+    BrainStorage.resetAllSiteData().then(function () {
+      var path = location.pathname || "/";
+      location.replace(path + "?_reset=" + Date.now());
+    });
   }
 
   function showScreen(name) {
