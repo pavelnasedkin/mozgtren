@@ -1,0 +1,11 @@
+{
+  "name": "МозгТрен",
+  "short_name": "МозгТрен",
+  "description": "Мини-игры для тренировки мозга",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#1a1f2e",
+  "theme_color": "#1a1f2e",
+  "orientation": "portrait",
+  "lang": "ru"
+}
