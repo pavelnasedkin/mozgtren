@@ -4,10 +4,11 @@
   var PREVIEW_DEFAULT = 5;
   var PREVIEW_MIN = 0;
   var PREVIEW_MAX = 20;
-  var CELLS_KEY = "mozgtren_memory_cells";
-  var CELLS_DEFAULT = 6;
-  var CELLS_MIN = 4;
-  var CELLS_MAX = 24;
+  var PAIRS_KEY = "mozgtren_memory_pairs";
+  var CELLS_KEY_LEGACY = "mozgtren_memory_cells";
+  var PAIRS_DEFAULT = 6;
+  var PAIRS_MIN = 2;
+  var PAIRS_MAX = 12;
 
   function getPreviewSec() {
     try {
@@ -31,35 +32,40 @@
     return n;
   }
 
-  function normalizeCells(n) {
+  function normalizePairs(n) {
     n = parseInt(n, 10);
-    if (isNaN(n)) n = CELLS_DEFAULT;
-    n = Math.min(CELLS_MAX, Math.max(CELLS_MIN, n));
-    if (n % 2 !== 0) n -= 1;
-    if (n < CELLS_MIN) n = CELLS_MIN;
-    return n;
+    if (isNaN(n)) n = PAIRS_DEFAULT;
+    return Math.min(PAIRS_MAX, Math.max(PAIRS_MIN, n));
   }
 
-  function getCellCount() {
+  function getPairCount() {
     try {
-      var raw = localStorage.getItem(CELLS_KEY);
-      if (raw == null || raw === "") return CELLS_DEFAULT;
-      return normalizeCells(raw);
+      var raw = localStorage.getItem(PAIRS_KEY);
+      if (raw != null && raw !== "") return normalizePairs(raw);
+
+      var legacy = localStorage.getItem(CELLS_KEY_LEGACY);
+      if (legacy != null && legacy !== "") {
+        var cells = parseInt(legacy, 10);
+        if (isNaN(cells)) cells = PAIRS_DEFAULT * 2;
+        if (cells % 2 !== 0) cells -= 1;
+        cells = Math.min(PAIRS_MAX * 2, Math.max(PAIRS_MIN * 2, cells));
+        var fromCells = normalizePairs(cells / 2);
+        localStorage.setItem(PAIRS_KEY, String(fromCells));
+        localStorage.removeItem(CELLS_KEY_LEGACY);
+        return fromCells;
+      }
+      return PAIRS_DEFAULT;
     } catch (e) {
-      return CELLS_DEFAULT;
+      return PAIRS_DEFAULT;
     }
   }
 
-  function setCellCount(cells) {
-    var n = normalizeCells(cells);
+  function setPairCount(pairs) {
+    var n = normalizePairs(pairs);
     try {
-      localStorage.setItem(CELLS_KEY, String(n));
+      localStorage.setItem(PAIRS_KEY, String(n));
     } catch (e) { /* */ }
     return n;
-  }
-
-  function pairCountFromCells(cells) {
-    return cells / 2;
   }
 
   function createSettingsRow(id, text, input) {
@@ -100,25 +106,25 @@
     previewInput.step = "1";
     previewInput.inputMode = "numeric";
     previewInput.value = String(getPreviewSec());
-    previewInput.setAttribute("aria-label", "Секунд показа всех карточек в начале игры");
+    previewInput.setAttribute("aria-label", "Время просмотра карточек в секундах");
     bindNumericInput(previewInput, getPreviewSec, setPreviewSec, restart);
 
-    var cellsInput = document.createElement("input");
-    cellsInput.id = "memory-cells";
-    cellsInput.type = "number";
-    cellsInput.className = "memory-settings__input";
-    cellsInput.min = String(CELLS_MIN);
-    cellsInput.max = String(CELLS_MAX);
-    cellsInput.step = "2";
-    cellsInput.inputMode = "numeric";
-    cellsInput.value = String(getCellCount());
-    cellsInput.setAttribute("aria-label", "Количество ячеек на поле");
-    bindNumericInput(cellsInput, getCellCount, setCellCount, restart);
+    var pairsInput = document.createElement("input");
+    pairsInput.id = "memory-pairs";
+    pairsInput.type = "number";
+    pairsInput.className = "memory-settings__input";
+    pairsInput.min = String(PAIRS_MIN);
+    pairsInput.max = String(PAIRS_MAX);
+    pairsInput.step = "1";
+    pairsInput.inputMode = "numeric";
+    pairsInput.value = String(getPairCount());
+    pairsInput.setAttribute("aria-label", "Количество пар на поле");
+    bindNumericInput(pairsInput, getPairCount, setPairCount, restart);
 
     wrap.appendChild(
-      createSettingsRow("memory-preview-sec", "Просмотр в начале (сек)", previewInput)
+      createSettingsRow("memory-preview-sec", "Время просмотра (сек)", previewInput)
     );
-    wrap.appendChild(createSettingsRow("memory-cells", "Количество ячеек", cellsInput));
+    wrap.appendChild(createSettingsRow("memory-pairs", "Количество пар", pairsInput));
     return wrap;
   }
 
@@ -129,7 +135,7 @@
     description: "Найдите все пары карточек",
     durationHint: "~2 мин",
     start: function (ctx) {
-      runMemory(ctx, pairCountFromCells(getCellCount()));
+      runMemory(ctx, getPairCount());
     },
     getSettingsEl: createSettingsEl,
   });
@@ -148,7 +154,11 @@
     var matched = 0;
     var moves = 0;
     var lock = false;
-    var previewTimer = null;
+    var countdownId = null;
+    var rememberBtn = null;
+    var hintBtn = null;
+    var actionsEl = null;
+    var inPreview = false;
     var previewSec = getPreviewSec();
     var deck = buildDeck(pairCount);
 
@@ -157,6 +167,10 @@
     grid.className = "memory-grid";
     grid.style.gridTemplateColumns = "repeat(" + gridColumns(cellCount) + ", 1fr)";
     area.appendChild(grid);
+
+    actionsEl = document.createElement("div");
+    actionsEl.className = "memory-actions";
+    area.appendChild(actionsEl);
 
     ctx.setProgress("Пары: 0 / " + pairCount);
 
@@ -172,13 +186,12 @@
     });
 
     ctx.onUnmount = function () {
-      if (previewTimer) clearTimeout(previewTimer);
+      if (countdownId) clearInterval(countdownId);
     };
 
     if (previewSec > 0) {
-      lock = true;
-      ctx.setHint("Запоминайте карточки · " + previewSec + " сек");
-      previewTimer = setTimeout(endPreview, previewSec * 1000);
+      ensureHintBtn();
+      startPreview();
     } else {
       hideAllCards();
       ctx.setHint("Откройте две одинаковые карточки");
@@ -193,11 +206,101 @@
       }
     }
 
+    function showAllUnmatchedCards() {
+      var cards = grid.querySelectorAll(".memory-card");
+      for (var i = 0; i < cards.length; i++) {
+        if (!cards[i].classList.contains("memory-card--matched")) {
+          cards[i].classList.remove("memory-card--hidden");
+        }
+      }
+    }
+
+    function setActionVisible(btn, visible) {
+      if (!btn) return;
+      btn.classList.toggle("memory-action--hidden", !visible);
+    }
+
+    function ensureRememberBtn() {
+      if (rememberBtn) {
+        setActionVisible(rememberBtn, true);
+        return rememberBtn;
+      }
+      rememberBtn = document.createElement("button");
+      rememberBtn.type = "button";
+      rememberBtn.className = "btn btn--primary memory-remember-btn";
+      rememberBtn.textContent = "Запомнил";
+      rememberBtn.addEventListener("click", function () {
+        endPreview();
+      });
+      actionsEl.appendChild(rememberBtn);
+      return rememberBtn;
+    }
+
+    function ensureHintBtn() {
+      if (hintBtn) return hintBtn;
+      hintBtn = document.createElement("button");
+      hintBtn.type = "button";
+      hintBtn.className = "btn btn--secondary memory-hint-btn";
+      hintBtn.textContent = "Подсказка";
+      hintBtn.addEventListener("click", function () {
+        if (inPreview || lock || previewSec <= 0 || matched >= pairCount) return;
+        startPreview();
+      });
+      actionsEl.appendChild(hintBtn);
+      return hintBtn;
+    }
+
+    function updateHintBtn() {
+      if (previewSec <= 0) {
+        setActionVisible(hintBtn, false);
+        return;
+      }
+      ensureHintBtn();
+      setActionVisible(hintBtn, !inPreview && matched < pairCount);
+    }
+
+    function startPreview() {
+      if (previewSec <= 0) return;
+      if (countdownId) {
+        clearInterval(countdownId);
+        countdownId = null;
+      }
+
+      inPreview = true;
+      flipped = [];
+      lock = true;
+      showAllUnmatchedCards();
+      ensureRememberBtn();
+      setActionVisible(rememberBtn, true);
+      setActionVisible(hintBtn, false);
+
+      var secondsLeft = previewSec;
+      ctx.setHint("Запоминайте карточки");
+      ctx.showTimer(true);
+      ctx.setTimer(secondsLeft);
+      countdownId = setInterval(function () {
+        secondsLeft -= 1;
+        if (secondsLeft <= 0) {
+          endPreview();
+          return;
+        }
+        ctx.setTimer(secondsLeft);
+      }, 1000);
+    }
+
     function endPreview() {
-      previewTimer = null;
+      if (countdownId) {
+        clearInterval(countdownId);
+        countdownId = null;
+      }
+      inPreview = false;
       hideAllCards();
+      flipped = [];
       lock = false;
+      setActionVisible(rememberBtn, false);
+      ctx.showTimer(false);
       ctx.setHint("Откройте две одинаковые карточки");
+      updateHintBtn();
     }
 
     function onFlip() {
@@ -222,6 +325,7 @@
         flipped = [];
         lock = false;
         if (matched >= pairCount) {
+          setActionVisible(hintBtn, false);
           var score = Math.max(10, 100 - moves * 3);
           var accuracy = Math.round((pairCount / moves) * 100);
           ctx.finish({ score: score, accuracy: Math.min(100, accuracy), detail: "Ходов: " + moves });

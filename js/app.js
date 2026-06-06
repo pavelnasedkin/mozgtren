@@ -14,6 +14,7 @@
   var queue = [];
   var queueIndex = 0;
   var isDaily = false;
+  var currentGameId = null;
   var currentUnmount = null;
 
   document.getElementById("btn-daily").addEventListener("click", startDaily);
@@ -21,6 +22,10 @@
   document.getElementById("btn-home").addEventListener("click", goHome);
   document.getElementById("btn-next").addEventListener("click", onNext);
   document.getElementById("btn-reset-site").addEventListener("click", resetSiteSettings);
+  document.querySelector(".result-actions").addEventListener("click", function (e) {
+    var target = e.target.closest("#btn-replay");
+    if (target) onReplay();
+  });
 
   renderHome();
 
@@ -70,6 +75,7 @@
     var game = BrainEngine.get(id);
     if (!game) return;
 
+    currentGameId = id;
     cleanupGame();
     showScreen("game");
     mountGameSettings(game, function () {
@@ -114,6 +120,7 @@
   }
 
   function showResult(game, result) {
+    currentGameId = game.id;
     var rec = BrainStorage.recordGame(game.id, result.score, result.accuracy);
     cleanupGame();
     showScreen("result");
@@ -127,13 +134,13 @@
 
     var nextBtn = document.getElementById("btn-next");
     if (isDaily && queueIndex < queue.length - 1) {
-      nextBtn.hidden = false;
       nextBtn.textContent = "Следующая игра";
+      nextBtn.classList.remove("result-action--hidden");
     } else if (isDaily && queueIndex >= queue.length - 1) {
-      nextBtn.hidden = false;
       nextBtn.textContent = "Завершить тренировку";
+      nextBtn.classList.remove("result-action--hidden");
     } else {
-      nextBtn.hidden = true;
+      nextBtn.classList.add("result-action--hidden");
     }
   }
 
@@ -144,6 +151,12 @@
       return;
     }
     goHome();
+  }
+
+  function onReplay() {
+    var id = currentGameId || queue[queueIndex];
+    if (!id) return;
+    startGame(id);
   }
 
   function mountGameSettings(game, onSettingChange) {

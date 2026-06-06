@@ -67,6 +67,10 @@ body {
   display: block;
 }
 
+.screen:not(.screen--active) {
+  display: none !important;
+}
+
 .stats {
   background: var(--surface);
   border-radius: var(--radius);
@@ -241,7 +245,7 @@ body {
 }
 
 .game-settings {
-  margin: 0.75rem 0;
+  margin-top: 1rem;
 }
 
 .game-settings[hidden] {
@@ -312,6 +316,24 @@ body {
 
 .memory-card:not(.memory-card--hidden):not(:disabled) {
   background: var(--accent-dim);
+}
+
+.memory-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 340px;
+  margin-top: 1rem;
+}
+
+.memory-remember-btn,
+.memory-hint-btn {
+  width: 100%;
+}
+
+.memory-action--hidden {
+  display: none !important;
 }
 
 /* Stroop */
@@ -435,6 +457,14 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
+}
+
+.result-action--hidden {
+  display: none !important;
+}
+
+.btn[hidden] {
+  display: none !important;
 }
 
 .feedback {
